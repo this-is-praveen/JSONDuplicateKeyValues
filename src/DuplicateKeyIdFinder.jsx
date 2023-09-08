@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
-import styled, { createGlobalStyle } from "styled-components";
+import React, { useEffect, useRef, useState } from "react";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import styled, { createGlobalStyle } from "styled-components";
 
 const GlobalStyles = createGlobalStyle`
   ::-webkit-scrollbar {
@@ -20,15 +20,42 @@ const GlobalStyles = createGlobalStyle`
 `;
 
 const CompBlock = styled.div`
-  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
 `;
 
+const StickyHeader = styled.header`
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background: #282c34;
+  padding: 10px 0;
+  text-align: center;
+  color: white;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 1000; // This ensures the header stays on top of other elements
+  font-size: 24px;
+`;
+const FooterBar = styled.footer`
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: #282c34;
+  padding: 10px 0;
+  text-align: end;
+  color: #fff;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 1000; // This ensures the footer stays on top of other elements
+`;
 const Container = styled.div`
   padding: 20px;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 10px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.1);
   backdrop-filter: blur(10px);
+  overflow: auto;
 `;
 
 const TextArea = styled.textarea`
@@ -69,17 +96,7 @@ const PermissionButton = styled.button`
   bottom: 20px;
   right: 20px;
   padding: 12px 24px;
-  background-color: rgba(
-    255,
-    255,
-    255,
-    0.1
-  ); // Semi-transparent white for the glass effect
-  border: 1px solid rgba(255, 255, 255, 0.3); // Border for better glass effect
-  backdrop-filter: blur(
-    10px
-  ); // Creates the blur behind the button for the glass effect
-  color: #fff;
+  background-color: rgba(255, 255, 255, 0.1);
   font-weight: bold;
   font-size: 16px;
   border-radius: 30px;
@@ -101,17 +118,6 @@ const PermissionButton = styled.button`
     transform: scale(0.95); // Slight shrink effect when button is clicked
   }
 `;
-const FooterBar = styled.div`
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  background: #282c34;
-  padding: 10px 0;
-  text-align: center;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-  z-index: 1000; // This ensures the footer stays on top of other elements
-`;
 
 const DuplicateKeyIdFinder = () => {
   const [keyName, setKeyName] = useState("accountId");
@@ -121,25 +127,29 @@ const DuplicateKeyIdFinder = () => {
   const [invalidJsonIndexes, setInvalidJsonIndexes] = useState([]);
   const [isAllKeysVisible, setAllKeysVisible] = useState(false);
   const [isDuplicatesVisible, setDuplicatesVisible] = useState(false);
-  const [permission, setPermission] = useState(null);
+  const [clipboardPermission, setClipboardPermission] = useState(null);
+  const headerRef = useRef(null);
+  const footerRef = useRef(null);
+  const headerHeight = headerRef.current?.clientHeight;
+  const bodyHeight = headerHeight + footerRef.current?.clientHeight;
 
-  const isClipBoardNotSupported = !("clipboard" in navigator);
   useEffect(() => {
-    if (isClipBoardNotSupported) {
-      console.error("Clipboard API not supported in this browser");
-      return;
-    }
-
-    // Check for permission status
-    if (navigator.permissions?.query) {
-      navigator.permissions.query({ name: "clipboard-read" }).then((result) => {
-        setPermission(result.state);
+    async function checkPermission() {
+      if (!navigator.permissions) {
+        return;
+      }
+      const permissionStatus = await navigator.permissions.query({
+        name: "clipboard-read",
       });
-    } else {
-      console.error("No supported navigatorQuery");
-    }
-  }, []);
+      setClipboardPermission(permissionStatus.state);
 
+      permissionStatus.onchange = () => {
+        setClipboardPermission(permissionStatus.state);
+      };
+    }
+
+    checkPermission();
+  }, []);
   useEffect(() => {
     const keyMap = {};
     const duplicatesList = [];
@@ -172,27 +182,6 @@ const DuplicateKeyIdFinder = () => {
     setDuplicates(duplicatesList);
   }, [jsonInputs, keyName]);
 
-  const requestPermission = () => {
-    if (!("clipboard" in navigator)) {
-      console.error("Clipboard API not supported in this browser");
-      return;
-    }
-
-    if (navigator.permissions?.request) {
-      navigator.permissions
-        .request({ name: "clipboard-read" })
-        .then((result) => {
-          if (result.state === "granted" || result.state === "prompt") {
-            setPermission(result.state);
-          } else {
-            toast.error("Permission not granted");
-          }
-        });
-    } else {
-      console.log("No navigator FN available");
-    }
-  };
-
   const showToast = (message, type = "success") => {
     if (type === "error") {
       toast(message, {
@@ -200,7 +189,7 @@ const DuplicateKeyIdFinder = () => {
         autoClose: 1000,
         closeOnClick: true,
         draggable: true,
-        type: "error"
+        type: "error",
       });
     } else {
       toast.success(message);
@@ -235,8 +224,15 @@ const DuplicateKeyIdFinder = () => {
   return (
     <CompBlock>
       <GlobalStyles />
-      <h1>Duplicate JSON's Key Value Finder</h1>
-      <Container>
+      <StickyHeader ref={headerRef}>
+        Duplicate JSON's Key Value Finder
+      </StickyHeader>
+      <Container
+        style={{
+          maxHeight: `calc(100vh - ${bodyHeight + 40}px)`,
+          marginTop: headerHeight,
+        }}
+      >
         <div>
           <label>Key Name: </label>
           <input
@@ -324,14 +320,14 @@ const DuplicateKeyIdFinder = () => {
             )}
           </div>
         )}
-        <FooterBar>
-          {!isClipBoardNotSupported && permission !== "granted" && (
-            <PermissionButton onClick={requestPermission}>
-              Grant Clipboard Permission
-            </PermissionButton>
-          )}
-        </FooterBar>
       </Container>
+      <FooterBar ref={footerRef}>
+        {clipboardPermission === "denied" && (
+          <p style={{ margin: 0, marginRight: 10 }}>
+            Enable Clipboard Permission for fast progression
+          </p>
+        )}
+      </FooterBar>
       <ToastContainer />
     </CompBlock>
   );
