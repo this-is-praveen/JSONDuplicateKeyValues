@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import styled, { createGlobalStyle } from "styled-components";
@@ -29,7 +30,7 @@ const StickyHeader = styled.header`
   top: 0;
   left: 0;
   width: 100%;
-  background: #282c34;
+  background: #000;
   padding: 10px 0;
   text-align: center;
   color: white;
@@ -41,20 +42,17 @@ const FooterBar = styled.footer`
   position: fixed;
   bottom: 0;
   left: 0;
+  display: flex;
+  justify-content: space-between;
   width: 100%;
-  background: #282c34;
+  background: #000;
   padding: 10px 0;
-  text-align: end;
   color: #fff;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
   z-index: 1000; // This ensures the footer stays on top of other elements
 `;
 const Container = styled.div`
   padding: 20px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(10px);
   overflow: auto;
 `;
 
@@ -63,12 +61,23 @@ const TextArea = styled.textarea`
   height: 100px;
   margin: 10px 0;
   box-sizing: border-box;
-  border: 1px solid #888;
+  background: #000;
+  color: #fff;
+  border: 1px solid #fff;
+  padding: 0.75rem;
   transition: border 0.3s;
   &:focus {
     border: 1px solid #555;
     outline: none;
   }
+`;
+
+const Input = styled.input`
+  background: #000;
+  color: #fff;
+  border: 1px solid #fff;
+  padding: 0.75rem;
+  width: 250px;
 `;
 
 const Button = styled.button`
@@ -85,42 +94,27 @@ const Button = styled.button`
 `;
 
 const ErrorMessage = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
   color: red;
+  background: #000;
   border: 1px solid red;
   padding: 5px;
   margin-bottom: 10px;
-`;
 
-const PermissionButton = styled.button`
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  padding: 12px 24px;
-  background-color: rgba(255, 255, 255, 0.1);
-  font-weight: bold;
-  font-size: 16px;
-  border-radius: 30px;
-  cursor: pointer;
-  transition: transform 0.3s ease, background-color 0.3s ease;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); // Subtle shadow for depth
-
-  &:hover {
-    background-color: rgba(
-      255,
-      255,
-      255,
-      0.2
-    ); // Slightly more prominent background on hover
-    transform: scale(1.05); // Slight zoom effect on hover for interactivity
-  }
-
-  &:active {
-    transform: scale(0.95); // Slight shrink effect when button is clicked
+  .note {
+    position: absolute;
+    right: 5px;
   }
 `;
 
-const DuplicateKeyIdFinder = () => {
-  const [keyName, setKeyName] = useState("accountId");
+const DuplicateKeyIdFinder = ({ theme = "", toggleTheme = () => {} }) => {
+  const [URLSearchParams, SetURLSearchParams] = useSearchParams({
+    key: "",
+  });
+  const keyName = URLSearchParams.get("key");
   const [jsonInputs, setJsonInputs] = useState([""]);
   const [duplicates, setDuplicates] = useState([]);
   const [allKeys, setAllKeys] = useState([]);
@@ -235,17 +229,25 @@ const DuplicateKeyIdFinder = () => {
       >
         <div>
           <label>Key Name: </label>
-          <input
+          <Input
             type="text"
             value={keyName}
-            onChange={(e) => setKeyName(e.target.value)}
+            onChange={(e) =>
+              SetURLSearchParams(
+                (prev) => {
+                  prev.set("key", e.target.value);
+                  return prev;
+                },
+                { replace: true }
+              )
+            }
             placeholder="Enter key name e.g. accountId"
           />
         </div>
 
         {keyName &&
           jsonInputs.map((jsonInput, index) => (
-            <div key={index}>
+            <div key={`${index + 1}_jsonInput`}>
               <TextArea
                 value={jsonInput}
                 onChange={(e) => {
@@ -257,7 +259,10 @@ const DuplicateKeyIdFinder = () => {
                 placeholder="Enter JSON here"
               />
               {invalidJsonIndexes.includes(index) && (
-                <ErrorMessage>Invalid JSON</ErrorMessage>
+                <ErrorMessage>
+                  <span>Invalid JSON</span>
+                  <span className="note">supports in array format</span>
+                </ErrorMessage>
               )}
             </div>
           ))}
@@ -289,7 +294,7 @@ const DuplicateKeyIdFinder = () => {
                 <h2>Duplicate Value of {keyName}:</h2>
                 <ol>
                   {duplicates.map((id, idx) => (
-                    <li key={idx}>{id}</li>
+                    <li key={`${idx + 1}_${id}`}>{id}</li>
                   ))}
                 </ol>
                 <Button onClick={() => copyToClipboard(duplicates)}>
@@ -310,7 +315,7 @@ const DuplicateKeyIdFinder = () => {
                 <h2>All Values of {keyName}:</h2>
                 <ol>
                   {allKeys.map((id, idx) => (
-                    <li key={idx}>{id}</li>
+                    <li key={`${idx + 1}_${id}`}>{id}</li>
                   ))}
                 </ol>
                 <Button onClick={() => copyToClipboard(allKeys)}>
@@ -322,13 +327,14 @@ const DuplicateKeyIdFinder = () => {
         )}
       </Container>
       <FooterBar ref={footerRef}>
+        <p style={{ margin: 0, marginLeft: 10 }}>PG</p>
         {clipboardPermission === "denied" && (
           <p style={{ margin: 0, marginRight: 10 }}>
             Enable Clipboard Permission for fast progression
           </p>
         )}
       </FooterBar>
-      <ToastContainer />
+      <ToastContainer theme={"dark"} />
     </CompBlock>
   );
 };
